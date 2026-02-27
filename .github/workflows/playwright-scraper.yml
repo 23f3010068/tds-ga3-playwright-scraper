@@ -1,0 +1,54 @@
+name: Playwright Table Scraper
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+jobs:
+  scrape-tables:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Playwright - 23f3001068@ds.study.iitm.ac.in
+        run: |
+          npm init -y
+          npm install playwright
+          npx playwright install chromium --with-deps
+          
+      - name: Scrape table sums seeds 86-95
+        run: |
+          cat > scrape.js << 'JSEOF'
+          const { chromium } = require('playwright');
+          
+          async function scrapeTable(page, seed) {
+            await page.goto(`https://sanand0.github.io/tdsdata/js_table/?seed=${seed}`);
+            await page.waitForSelector('table');
+            const numbers = await page.$$eval('td', cells => 
+              cells.map(c => parseInt(c.textContent.trim()) || 0)
+            );
+            return numbers.reduce((a, b) => a + b, 0);
+          }
+          
+          (async () => {
+            const browser = await chromium.launch();
+            const page = await browser.newPage();
+            let total = 0;
+            for (let seed = 86; seed <= 95; seed++) {
+              const sum = await scrapeTable(page, seed);
+              console.log(`Seed ${seed}: ${sum}`);
+              total += sum;
+            }
+            console.log(`Total sum: ${total}`);
+            await browser.close();
+          })();
+          JSEOF
+          node scrape.js
